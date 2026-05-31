@@ -1,0 +1,34 @@
+# === Django / Python ===
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# === Entornos Virtuales ===
+.venv/
+venv/
+ENV/
+env/
+
+# === Variables de Entorno y Secretos ===
+.env
+.env.local
+.secret
+secrets.json
+
+# === Editores de Código e IDEs ===
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+.DS_Store
+Thumbs.db
+
