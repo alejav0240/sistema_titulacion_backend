@@ -10,8 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
-import os
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-@4pu!cckx&t0jryz5ep=s7xl3q5zp=hiev@h!fks6oe#v36mr+'
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -38,11 +38,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
-    # Local apps
-    'users',
-    'academics',
-    'projects',
+    'rest_framework',
+    'apps.users',
+    'apps.academic',
+    'apps.projects',
+    'apps.annotations',
+    'apps.notifications',
+    'apps.schedules',
+    'apps.relationships',
 ]
 
 AUTH_USER_MODEL = 'users.Usuario'
@@ -82,20 +85,14 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'postgres',  # o nombre de tu DB
+        'USER': 'postgres.wuixjirfzarhbeuudkcy',
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': 'aws-1-us-west-2.pooler.supabase.com',
+        'PORT': '5432',
     }
 }
-
-if os.environ.get('DB_NAME'):
-    DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME'),
-        'USER': os.environ.get('DB_USER'),
-        'PASSWORD': os.environ.get('DB_PASS'),
-        'HOST': os.environ.get('DB_HOST', 'db'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
-    }
 
 
 # Password validation
