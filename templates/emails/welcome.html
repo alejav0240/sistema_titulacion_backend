@@ -1,0 +1,20 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Bienvenido a SICI{% endblock %}
+
+{% block content %}
+<h2>&iexcl;Bienvenido/a, {{ nombre }}!</h2>
+
+<p>Tu cuenta ha sido creada exitosamente en el <strong>Sistema de Control de Titulaci&oacute;n</strong> de la Universidad del Valle.</p>
+
+<div class="info-box">
+  <p><strong>Tu correo de acceso:</strong> {{ email }}</p>
+  {% if password %}
+  <p style="margin-top: 8px;"><strong>Tu contrase&ntilde;a:</strong> {{ password }}</p>
+  {% endif %}
+</div>
+
+<p>Ya puedes iniciar sesi&oacute;n y comenzar a gestionar tu proceso de titulaci&oacute;n.</p>
+
+<p>Si tienes alguna pregunta, no dudes en contactarnos.</p>
+{% endblock %}
