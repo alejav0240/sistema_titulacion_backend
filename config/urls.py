@@ -24,6 +24,7 @@ urlpatterns = [
 
     # Users
     path('api/', include('apps.users.urls')),
+    path('api/', include('apps.projects.urls')),
 
     # JWT (pa las cookies)
     path('api/login/', CookieTokenObtainPairView.as_view(), name='token_obtain_pair'),

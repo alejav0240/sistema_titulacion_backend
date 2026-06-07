@@ -51,10 +51,6 @@ dist/
 build/
 *.egg-info/
 
-# Migrations (except __init__.py)
-apps/*/migrations/
-!apps/*/migrations/__init__.py
-
 # Supabase
 supabase/.branches
 supabase/.git

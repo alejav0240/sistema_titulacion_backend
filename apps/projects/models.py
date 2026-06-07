@@ -4,6 +4,7 @@ from apps.users.models import Usuario
 
 class EstadoProyecto(models.TextChoices):
     EN_CURSO = 'EN CURSO'
+    EN_REVISION = 'EN REVISION'
     CONCLUIDO = 'CONCLUIDO'
 
 
@@ -23,7 +24,7 @@ class ProyectoGrado(models.Model):
     estado = models.CharField(
         max_length=20,
         choices=EstadoProyecto.choices,
-        default=EstadoProyecto.EN_CURSO
+        default=EstadoProyecto.EN_REVISION
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
