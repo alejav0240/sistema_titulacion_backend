@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -39,6 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt',
+    'corsheaders',
     'apps.users',
     'apps.academic',
     'apps.projects',
@@ -48,9 +51,36 @@ INSTALLED_APPS = [
     'apps.relationships',
 ]
 
+REST_FRAMEWORK={
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'apps.users.authentication.CookieJWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,
+}
+
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': False,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_COOKIE': 'access_token',
+    'AUTH_COOKIE_DOMAIN': None,
+    'AUTH_COOKIE_SECURE': False,
+    'AUTH_COOKIE_HTTPONLY': True,
+    'AUTH_COOKIE_SAMESITE': 'Lax',
+}
+
+
 AUTH_USER_MODEL = 'users.Usuario'
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -65,7 +95,7 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -113,6 +143,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+CORS_ALLOWED_ORIGINS = ["http://localhost:3000"]
+CORS_ALLOW_CREDENTIALS = True
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
@@ -128,5 +161,13 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = os.getenv('EMAIL_HOST_USER')
 
 STATIC_URL = 'static/'

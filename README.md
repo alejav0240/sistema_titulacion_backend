@@ -52,8 +52,7 @@ python manage.py runserver
 Crea un archivo `.env` en la raíz del proyecto:
 
 ```env
-SECRET_KEY=clave-secreta
-DB_PASSWORD=password-de-supabase
+en teams xd
 ```
 
 ## Estructura del Proyecto
