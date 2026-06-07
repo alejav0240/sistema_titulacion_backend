@@ -13,7 +13,7 @@ class Rol(models.TextChoices):
 
 
 class UsuarioManager(BaseUserManager):
-    def create_user(self, email, nombre, password, rol=Rol.ESTUDIANTE, **extra_fields):
+    def create_user(self, email, nombre, password, rol, **extra_fields):
         if not email:
             raise ValueError('El email es obligatorio')
         email = self.normalize_email(email)

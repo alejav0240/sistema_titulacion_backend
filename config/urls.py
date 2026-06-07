@@ -14,9 +14,19 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from apps.users.auth_views import CookieTokenObtainPairView, logout, CookieTokenRefreshView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    # Users
+    path('api/', include('apps.users.urls')),
+
+    # JWT (pa las cookies)
+    path('api/login/', CookieTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/login/refresh/', CookieTokenRefreshView.as_view(), name='token_refresh'),
+    path('api/logout/', logout, name="session_logout")
 ]
