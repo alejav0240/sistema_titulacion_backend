@@ -1,5 +1,4 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
-from django.contrib.auth.password_validation import password_changed
 from django.db import models
 
 
@@ -25,6 +24,13 @@ class UsuarioManager(BaseUserManager):
     def create_superuser(self, email, nombre, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('rol', Rol.DIRECTOR)
+
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('El superusuario debe tener is_staff=True')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('El superusuario debe tener is_superuser=True')
+
         return self.create_user(email, nombre, password, **extra_fields)
 
 
