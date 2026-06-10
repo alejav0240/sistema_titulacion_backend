@@ -35,3 +35,4 @@ secrets.json
 .DS_Store
 Thumbs.db
 
+config/__pycache__/__init__.cpython-314.pyc
