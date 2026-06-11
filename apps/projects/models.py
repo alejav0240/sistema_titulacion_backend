@@ -44,8 +44,9 @@ class Version(models.Model):
         on_delete=models.CASCADE,
         related_name='versiones'
     )
-    numero_version = models.IntegerField()
-    url_pdf = models.CharField(max_length=255)
+    numero_version = models.IntegerField(editable=False)
+    url_pdf = models.CharField(max_length=500)
+    nombre_archivo = models.CharField(max_length=255, blank=True, default='')
     estado = models.CharField(
         max_length=20,
         choices=EstadoVersion.choices,
@@ -57,6 +58,14 @@ class Version(models.Model):
         db_table = 'versiones'
         unique_together = ('proyecto', 'numero_version')
         ordering = ['-numero_version']
+
+    def save(self, *args, **kwargs):
+        if self.numero_version is None or self._state.adding:
+            max_version = Version.objects.filter(
+                proyecto=self.proyecto
+            ).aggregate(max_v=models.Max('numero_version'))['max_v']
+            self.numero_version = (max_version or 0) + 1
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.proyecto.titulo} - Version {self.numero_version}"
