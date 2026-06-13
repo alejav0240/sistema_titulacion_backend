@@ -39,8 +39,11 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     nombre = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
     rol = models.CharField(max_length=20, choices=Rol.choices, default=Rol.ESTUDIANTE)
-    
-    
+    # Flags informativos del perfil (p.ej. "TIEMPO_COMPLETO"); los roles efectivos
+    # de tutor/tribunal se derivan de TutorTribunal y de las materias a cargo
+    capacidades = models.JSONField(default=list, blank=True)
+
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

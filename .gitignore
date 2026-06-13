@@ -58,3 +58,5 @@ supabase/.git
 # Logs
 logs/
 *.log
+__pycache__/
+*.pyc

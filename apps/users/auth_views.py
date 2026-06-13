@@ -9,6 +9,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from rest_framework import serializers, status
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.throttling import ScopedRateThrottle
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
@@ -44,6 +45,8 @@ class CookieTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class CookieTokenObtainPairView(TokenObtainPairView):
     serializer_class = CookieTokenObtainPairSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'login'
 
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
