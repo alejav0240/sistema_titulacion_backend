@@ -22,9 +22,15 @@ from apps.users.auth_views import CookieTokenObtainPairView, logout, CookieToken
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    # Users
+    # APIs
     path('api/', include('apps.users.urls')),
     path('api/', include('apps.projects.urls')),
+    path('api/', include('apps.annotations.urls')),
+    path('api/', include('apps.relationships.urls')),
+    path('api/', include('apps.notifications.urls')),
+    path('api/', include('apps.schedules.urls')),
+    path('api/', include('apps.academic.urls')),
+    path('api/', include('apps.reports.urls')),
 
     # JWT (pa las cookies)
     path('api/login/', CookieTokenObtainPairView.as_view(), name='token_obtain_pair'),
