@@ -1,38 +1,60 @@
-# === Django / Python ===
-*.pyc
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*/__pycache__/
-*.pyo
-*.pyd
-.Python
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environment
+env/
+venv/
+.venv/
+
+# Django stuff
+*.log
+local_settings.py
 db.sqlite3
 db.sqlite3-journal
 media/
 staticfiles/
-*/migrations/
 
+# Static files
+*.css.map
+*.js.map
 
-# === Entornos Virtuales ===
-.venv/
-venv/
-ENV/
-env/
-
-# === Variables de Entorno y Secretos ===
-.env
-.env.local
-.secret
-secrets.json
-
-# === Editores de Código e IDEs ===
-.vscode/
+# IDE
 .idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
+.vscode/
 *.swp
+*.swo
+*~
+
+# OS
 .DS_Store
 Thumbs.db
 
-config/__pycache__/__init__.cpython-314.pyc
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Coverage
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+*.py,cover
+
+# Distribution
+dist/
+build/
+*.egg-info/
+
+# Supabase
+supabase/.branches
+supabase/.git
+
+# Logs
+logs/
+*.log
