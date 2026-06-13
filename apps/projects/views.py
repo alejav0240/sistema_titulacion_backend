@@ -1,4 +1,5 @@
 import logging
+import re
 
 import requests as http_requests
 
@@ -405,10 +406,37 @@ class VersionReviewView(APIView):
 
 DRIVE_DOWNLOAD_URL = 'https://drive.usercontent.google.com/download'
 MAX_PDF_BYTES = 50 * 1024 * 1024  # 50 MB
+DRIVE_TIMEOUT = 30
+# Las páginas intermedias de confirmación de Drive pesan unos pocos KB.
+INTERSTITIAL_MAX_BYTES = 1024 * 1024
+# UA de navegador: Drive entrega contenido distinto (o páginas de bot) ante UAs raros.
+BROWSER_USER_AGENT = (
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+    '(KHTML, like Gecko) Chrome/124.0 Safari/537.36'
+)
+_HIDDEN_INPUT_RE = re.compile(
+    r'<input[^>]*\btype="hidden"[^>]*\bname="([^"]+)"[^>]*\bvalue="([^"]*)"',
+    re.IGNORECASE,
+)
+_FORM_ACTION_RE = re.compile(r'<form[^>]*\baction="([^"]+)"', re.IGNORECASE)
+
+
+class _ProxyError(Exception):
+    """Error con mensaje listo para el usuario y código HTTP asociado."""
+
+    def __init__(self, detail, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY):
+        super().__init__(detail)
+        self.detail = detail
+        self.status = status_code
 
 
 class VersionPdfProxyView(APIView):
-    """Descarga el PDF desde Google Drive y lo sirve al frontend (evita CORS)."""
+    """Descarga el PDF desde Google Drive y lo sirve al frontend (evita CORS).
+
+    Maneja la pantalla intermedia de advertencia antivirus que Drive muestra para
+    archivos grandes (extrae el token de confirmación y reintenta), y devuelve
+    mensajes de error específicos según la causa real del fallo.
+    """
 
     permission_classes = [IsAuthenticated]
 
@@ -428,53 +456,131 @@ class VersionPdfProxyView(APIView):
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
 
+        session = http_requests.Session()
+        session.headers.update({'User-Agent': BROWSER_USER_AGENT})
         try:
-            if file_id:
-                upstream = http_requests.get(
-                    DRIVE_DOWNLOAD_URL,
-                    params={'id': file_id, 'export': 'download', 'confirm': 't'},
-                    stream=True,
-                    timeout=30,
-                )
-            else:
-                upstream = http_requests.get(
-                    version.url_pdf, stream=True, timeout=30
-                )
+            upstream, iterator, first_chunk = self._open_pdf_stream(
+                session, version, file_id
+            )
+        except _ProxyError as err:
+            session.close()
+            return Response({'detail': err.detail}, status=err.status)
         except http_requests.Timeout:
+            session.close()
             return Response(
                 {'detail': 'Google Drive tardó demasiado en responder. '
                            'Intenta de nuevo en unos minutos.'},
                 status=status.HTTP_504_GATEWAY_TIMEOUT,
             )
         except http_requests.ConnectionError:
+            session.close()
             return Response(
                 {'detail': 'No se pudo conectar con Google Drive. '
                            'Revisa la conexión del servidor.'},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
         except http_requests.RequestException:
+            session.close()
             logger.exception('Error descargando el PDF de la versión %s', version.id)
             return Response(
                 {'detail': 'No se pudo descargar el documento desde Google Drive.'},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
+        def stream():
+            total = len(first_chunk)
+            try:
+                yield first_chunk
+                for chunk in iterator:
+                    total += len(chunk)
+                    if total > MAX_PDF_BYTES:
+                        logger.warning(
+                            'PDF de la versión %s supera 50MB sin declararlo; '
+                            'stream cortado', version.id,
+                        )
+                        return
+                    yield chunk
+            finally:
+                upstream.close()
+                session.close()
+
+        response = StreamingHttpResponse(stream(), content_type='application/pdf')
+        response['Content-Disposition'] = (
+            f'inline; filename="{version.nombre_archivo or f"version_{version.id}.pdf"}"'
+        )
+        response['Cache-Control'] = 'private, max-age=3600'
+        return response
+
+    # -- helpers de descarga ------------------------------------------------
+
+    def _open_pdf_stream(self, session, version, file_id):
+        """Devuelve (upstream, iterator, first_chunk) listos para retransmitir.
+
+        Lanza _ProxyError (mensaje específico) si Drive no entrega un PDF.
+        """
+        if file_id:
+            upstream = session.get(
+                DRIVE_DOWNLOAD_URL,
+                params={'id': file_id, 'export': 'download'},
+                stream=True,
+                timeout=DRIVE_TIMEOUT,
+            )
+        else:
+            upstream = session.get(
+                version.url_pdf, stream=True, timeout=DRIVE_TIMEOUT
+            )
+
+        upstream, iterator, first_chunk = self._peek(upstream)
+        if first_chunk.startswith(b'%PDF'):
+            return upstream, iterator, first_chunk
+
+        # Para archivos grandes, Drive responde una página HTML de confirmación
+        # antivirus en vez de los bytes; extraemos el token y reintentamos.
+        if file_id and self._looks_like_html(upstream, first_chunk):
+            html = self._read_text(iterator, first_chunk)
+            upstream.close()
+            params = self._extract_confirm_params(html)
+            if not params:
+                raise _ProxyError(
+                    'Google Drive no entregó el PDF: el archivo puede ser privado '
+                    'o requerir inicio de sesión. Compártelo como «Cualquier '
+                    'persona con el enlace».'
+                )
+            action = params.pop('_action', DRIVE_DOWNLOAD_URL)
+            upstream = session.get(
+                action, params=params, stream=True, timeout=DRIVE_TIMEOUT
+            )
+            upstream, iterator, first_chunk = self._peek(upstream)
+            if first_chunk.startswith(b'%PDF'):
+                return upstream, iterator, first_chunk
+            upstream.close()
+            raise _ProxyError(
+                'El enlace de Google Drive no entregó un PDF tras la confirmación. '
+                'Verifica que apunte a un archivo PDF público.'
+            )
+
+        upstream.close()
+        raise _ProxyError(
+            'El archivo no es un PDF accesible. Verifica que el link sea público '
+            'y apunte a un PDF.'
+        )
+
+    @staticmethod
+    def _peek(upstream):
+        """Valida status/tamaño y extrae el primer chunk del cuerpo."""
         if upstream.status_code != 200:
             upstream.close()
-            return Response(
-                {'detail': 'Google Drive rechazó la descarga. Verifica que el '
-                           'archivo esté compartido como "Cualquier persona con '
-                           'el enlace".'},
-                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            raise _ProxyError(
+                'Google Drive rechazó la descarga. Verifica que el archivo esté '
+                'compartido como «Cualquier persona con el enlace».'
             )
 
         declared = upstream.headers.get('Content-Length')
-        if declared and int(declared) > MAX_PDF_BYTES:
+        if declared and declared.isdigit() and int(declared) > MAX_PDF_BYTES:
             upstream.close()
-            return Response(
-                {'detail': 'El documento supera el límite de 50 MB. '
-                           'Sube una versión más liviana.'},
-                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            raise _ProxyError(
+                'El documento supera el límite de 50 MB. Sube una versión más '
+                'liviana.'
             )
 
         iterator = upstream.iter_content(chunk_size=64 * 1024)
@@ -482,38 +588,36 @@ class VersionPdfProxyView(APIView):
             first_chunk = next(iterator)
         except StopIteration:
             first_chunk = b''
+        return upstream, iterator, first_chunk
 
-        if not first_chunk.startswith(b'%PDF'):
-            upstream.close()
-            return Response(
-                {'detail': 'El archivo no es un PDF accesible. Verifica que el '
-                           'link sea público y apunte a un PDF.'},
-                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            )
+    @staticmethod
+    def _looks_like_html(upstream, first_chunk):
+        ctype = upstream.headers.get('Content-Type', '').lower()
+        if 'text/html' in ctype:
+            return True
+        head = first_chunk.lstrip()[:512].lower()
+        return head.startswith(b'<!doctype html') or head.startswith(b'<html')
 
-        def stream():
-            total = len(first_chunk)
-            yield first_chunk
-            for chunk in iterator:
-                total += len(chunk)
-                if total > MAX_PDF_BYTES:
-                    logger.warning(
-                        'PDF de la versión %s supera 50MB sin declararlo; '
-                        'stream cortado', version.id,
-                    )
-                    upstream.close()
-                    return
-                yield chunk
+    @staticmethod
+    def _read_text(iterator, first_chunk):
+        """Acumula el cuerpo (HTML pequeño) sin reventar memoria."""
+        buf = bytearray(first_chunk)
+        for chunk in iterator:
+            buf.extend(chunk)
+            if len(buf) > INTERSTITIAL_MAX_BYTES:
+                break
+        return buf.decode('utf-8', errors='replace')
 
-        response = StreamingHttpResponse(stream(), content_type='application/pdf')
-        response['Content-Disposition'] = (
-            f'inline; filename="{version.nombre_archivo or f"version_{version.id}.pdf"}"'
-        )
-        response['Cache-Control'] = 'private, max-age=3600'
-        length = upstream.headers.get('Content-Length')
-        if length:
-            response['Content-Length'] = length
-        return response
+    @staticmethod
+    def _extract_confirm_params(html):
+        """Extrae los campos del formulario de descarga de la página intermedia."""
+        params = {name: value for name, value in _HIDDEN_INPUT_RE.findall(html)}
+        if not params:
+            return None
+        action_match = _FORM_ACTION_RE.search(html)
+        action = action_match.group(1) if action_match else DRIVE_DOWNLOAD_URL
+        params['_action'] = action.replace('&amp;', '&')
+        return params
 
 
 class DefensaView(APIView):

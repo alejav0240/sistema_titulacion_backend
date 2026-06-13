@@ -16,6 +16,20 @@ from django.contrib.auth import get_user_model
 from apps.users.permissions import IsAuthenticated
 
 
+def _set_jwt_cookie(response, name, value, max_age):
+    """Setea una cookie JWT con los flags de SIMPLE_JWT (consistente en login y refresh)."""
+    if value is None:
+        return
+    response.set_cookie(
+        name,
+        value,
+        httponly=settings.SIMPLE_JWT.get('AUTH_COOKIE_HTTPONLY', True),
+        secure=settings.SIMPLE_JWT.get('AUTH_COOKIE_SECURE', False),
+        samesite=settings.SIMPLE_JWT.get('AUTH_COOKIE_SAMESITE', 'Lax'),
+        max_age=max_age,
+    )
+
+
 class CookieTokenObtainPairSerializer(TokenObtainPairSerializer):
     rememberMe = serializers.BooleanField(required=False, default=False)
     
@@ -54,28 +68,18 @@ class CookieTokenObtainPairView(TokenObtainPairView):
             access_token = response.data.get('access')
             refresh_token = response.data.get('refresh')
 
-            response.set_cookie(
+            _set_jwt_cookie(
+                response,
                 'access_token',
                 access_token,
-                httponly=settings.SIMPLE_JWT.get('AUTH_COOKIE_HTTPONLY', True),
-                secure=settings.SIMPLE_JWT.get('AUTH_COOKIE_SECURE', False),
-                samesite=settings.SIMPLE_JWT.get('AUTH_COOKIE_SAMESITE', 'Lax'),
-                max_age=int(settings.SIMPLE_JWT.get('ACCESS_TOKEN_LIFETIME').total_seconds()),
+                int(settings.SIMPLE_JWT.get('ACCESS_TOKEN_LIFETIME').total_seconds()),
             )
 
             remember = request.data.get('rememberMe', False)
             max_age_refresh = 30 * 24 * 60 * 60 if remember else int(settings.SIMPLE_JWT.get('REFRESH_TOKEN_LIFETIME').total_seconds())
-            
-            response.set_cookie(
-                'refresh_token',
-                refresh_token,
-                httponly=settings.SIMPLE_JWT.get('AUTH_COOKIE_HTTPONLY', True),
-                secure=settings.SIMPLE_JWT.get('AUTH_COOKIE_SECURE', False),
-                samesite=settings.SIMPLE_JWT.get('AUTH_COOKIE_SAMESITE', 'Lax'),
-                max_age=max_age_refresh
-            )
-            
-            
+
+            _set_jwt_cookie(response, 'refresh_token', refresh_token, max_age_refresh)
+
             response.data.pop('access', None)
             response.data.pop('refresh', None)
         
@@ -99,9 +103,18 @@ class CookieTokenRefreshView(TokenRefreshView):
             access_token = response.data.get('access')
             refresh_token = response.data.get('refresh')
 
-            response.set_cookie('access_token', access_token)
-            if refresh_token:
-                response.set_cookie('refresh_token', refresh_token)
+            _set_jwt_cookie(
+                response,
+                'access_token',
+                access_token,
+                int(settings.SIMPLE_JWT.get('ACCESS_TOKEN_LIFETIME').total_seconds()),
+            )
+            _set_jwt_cookie(
+                response,
+                'refresh_token',
+                refresh_token,
+                int(settings.SIMPLE_JWT.get('REFRESH_TOKEN_LIFETIME').total_seconds()),
+            )
 
             response.data.pop('access', None)
             response.data.pop('refresh', None)
